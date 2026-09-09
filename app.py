@@ -1,28 +1,24 @@
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
+import json
 
 st.title("🕌 Mosque Prayer Times Panel")
 
 # 1. Passcode Protection
 passcode = st.sidebar.text_input("Enter Admin Passcode", type="password")
 
-# Check if the entered passcode matches the secret passcode
 if passcode != st.secrets["ADMIN_PASSCODE"]:
     st.warning("Please enter the correct passcode in the sidebar to access the dashboard.")
-    st.stop() # Stops the rest of the code from running until password is correct
+    st.stop() 
 
-# 2. Initialize Firebase using Streamlit Secrets (No JSON file needed)
+# 2. Initialize Firebase using raw JSON (Bypasses TOML formatting errors)
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        # Pulls the Firebase credentials from the secure Streamlit cloud
-        firebase_secrets = dict(st.secrets["firebase"])
-        
-        # This line forces the server to read the line breaks in your private key correctly
-        firebase_secrets["private_key"] = firebase_secrets["private_key"].replace("\\n", "\n")
-        
-        cred = credentials.Certificate(firebase_secrets)
+        # Pulls the raw JSON text from Streamlit Secrets and converts it to a dictionary
+        key_dict = json.loads(st.secrets["FIREBASE_JSON"])
+        cred = credentials.Certificate(key_dict)
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
