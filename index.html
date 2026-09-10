@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mosque Prayer Times</title>
+
+    <!-- PWA Setup (Prepares the app to be installed on home screens) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Mosque Times">
+
+    <!-- Tailwind CSS for rapid mobile styling without external stylesheets -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased pb-10">
+
+    <!-- Header -->
+    <div class="bg-emerald-600 text-white p-6 text-center shadow-md">
+        <h1 class="text-2xl font-bold">Mosque Schedule</h1>
+        <p class="text-sm mt-1 opacity-90">Live Prayer Times</p>
+    </div>
+
+    <!-- Notification Button Area (Hidden initially by JavaScript) -->
+    <div id="notification-section" class="max-w-md mx-auto mt-4 px-4 hidden">
+        <button id="enable-notifications-btn" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-sm active:bg-blue-700 transition">
+            🔔 Enable Prayer Alerts
+        </button>
+    </div>
+
+    <!-- Prayer Times Container -->
+    <div class="max-w-md mx-auto mt-6 px-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <ul class="divide-y divide-gray-100">
+                <li class="flex justify-between p-4"><span class="font-medium text-gray-600">Fajr</span><span id="fajr" class="font-bold text-gray-900">--:--</span></li>
+                <li class="flex justify-between p-4 bg-yellow-50"><span class="font-medium text-yellow-700">Sunrise</span><span id="sunrise" class="font-bold text-yellow-800">--:--</span></li>
+                <li class="flex justify-between p-4"><span class="font-medium text-gray-600">Zuhr</span><span id="zuhr" class="font-bold text-gray-900">--:--</span></li>
+                <li class="flex justify-between p-4"><span class="font-medium text-gray-600">Asr</span><span id="asr" class="font-bold text-gray-900">--:--</span></li>
+                <li class="flex justify-between p-4"><span class="font-medium text-gray-600">Maghrib</span><span id="maghrib" class="font-bold text-gray-900">--:--</span></li>
+                <li class="flex justify-between p-4"><span class="font-medium text-gray-600">Isha</span><span id="isha" class="font-bold text-gray-900">--:--</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- iOS Install Modal (Hidden by default, triggered by device detection) -->
+    <div id="ios-install-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex-col justify-end z-50">
+        <div class="bg-white rounded-t-2xl p-6 pb-10 text-center shadow-2xl transition-transform duration-300 transform translate-y-0">
+            <h2 class="text-xl font-bold mb-2">Get Prayer Alerts 🔔</h2>
+            <p class="text-gray-600 mb-6">To receive notifications on your iPhone, you must install this app to your Home Screen.</p>
+            <div class="bg-gray-50 rounded-lg p-4 text-left border border-gray-200">
+                <p class="mb-2 text-sm">1. Tap the <strong>Share</strong> icon at the bottom of Safari.</p>
+                <p class="text-sm">2. Scroll down and tap <strong>Add to Home Screen</strong> <span class="bg-gray-200 px-2 py-1 rounded text-xs mx-1">+</span>.</p>
+            </div>
+            <button id="close-modal-btn" class="mt-6 text-gray-500 font-medium p-2">Close</button>
+        </div>
+    </div>
+
+    <!-- Script connection -->
+    <script src="script.js"></script>
+</body>
+</html>
