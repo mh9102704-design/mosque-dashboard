@@ -1,0 +1,16 @@
+{
+  "name": "Mosque Prayer Times",
+  "short_name": "Prayer Times",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "description": "Live prayer schedule and notifications",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2366/2366229.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
