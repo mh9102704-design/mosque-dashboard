@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 
 const firebaseConfig = {
@@ -14,7 +14,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 1. Live Sync
+// 1. Live Sync (Runs immediately so they see times while installing)
 const docRef = doc(db, "prayer_times", "current_schedule");
 onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
@@ -28,27 +28,36 @@ onSnapshot(docRef, (docSnap) => {
     }
 });
 
-// 2. Strict Device Routing
+// 2. Strict iOS Detection & PWA Enforcement
 const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-const isStandalone = () => ('standalone' in window.navigator) && (window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
+const isStandalone = () => ('standalone' in window.navigator) && (window.navigator.standalone);
 
-// If iOS and NOT on home screen -> Force Install Modal
+// If they are on an iPhone but in the Safari browser, show the instructional overlay
 if (isIos() && !isStandalone()) {
-    document.getElementById('ios-install-modal').classList.remove('hidden');
-    document.getElementById('ios-install-modal').classList.add('flex');
+    const modal = document.getElementById('ios-install-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Inject strictly Apple-specific visual instructions
+    document.querySelector('#ios-install-modal .bg-gray-50').innerHTML = `
+        <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 24px; margin-right: 12px;">📤</span>
+            <p class="text-sm m-0">Tap the <strong>Share</strong> icon at the bottom of Safari.</p>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <span style="font-size: 24px; margin-right: 12px;">➕</span>
+            <p class="text-sm m-0">Scroll down and tap <strong>Add to Home Screen</strong>.</p>
+        </div>
+    `;
 }
 
+// Ensure they can dismiss the modal if they just want to read the times
 document.getElementById('close-modal-btn').addEventListener('click', () => {
     document.getElementById('ios-install-modal').classList.add('hidden');
     document.getElementById('ios-install-modal').classList.remove('flex');
 });
 
-// Show Notification button for Android (always) OR installed iOS
-if (!isIos() || isStandalone()) {
-    document.getElementById('notification-section').classList.remove('hidden');
-}
-
-// 3. Push Notifications
+// 3. Notification Setup (ONLY triggers in the installed Home Screen app)
 const setupNotifications = async () => {
     try {
         const messagingSupported = await isSupported();
@@ -57,26 +66,11 @@ const setupNotifications = async () => {
         const messaging = getMessaging(app);
         const enableBtn = document.getElementById('enable-notifications-btn');
         
-        const showFrictionlessError = () => {
-            enableBtn.innerText = "🔒 Action Required";
-            enableBtn.classList.replace("bg-blue-600", "bg-orange-600");
-            let helpText = document.getElementById('perm-help');
-            if (!helpText) {
-                helpText = document.createElement('div');
-                helpText.id = 'perm-help';
-                helpText.className = "text-sm text-gray-700 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-left shadow-sm";
-                helpText.innerHTML = "<strong>Alerts are blocked by your browser.</strong><br><br>1. Tap the settings icon next to the web address at the top.<br>2. Tap <strong>Permissions</strong>.<br>3. Allow Notifications.<br>4. Reload this page.";
-                enableBtn.parentNode.appendChild(helpText);
-            }
-        };
+        // Only unhide the notification button in the installed app environment
+        document.getElementById('notification-section').classList.remove('hidden');
 
         enableBtn.addEventListener('click', async () => {
             try {
-                if (Notification.permission === 'denied') {
-                    showFrictionlessError();
-                    return;
-                }
-
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
                     const swPath = window.location.pathname.includes('mosque-dashboard') 
@@ -90,22 +84,25 @@ const setupNotifications = async () => {
                     });
                     
                     if (token) {
+                        // Automatically register the user to Firestore
+                        await setDoc(doc(db, "subscribers", token), {
+                            token: token,
+                            timestamp: new Date()
+                        });
+
                         enableBtn.innerText = "✅ Alerts Enabled";
                         enableBtn.classList.replace("bg-blue-600", "bg-emerald-600");
-                        if(enableBtn.classList.contains("bg-orange-600")) enableBtn.classList.replace("bg-orange-600", "bg-emerald-600");
                         enableBtn.disabled = true;
-                        const helpText = document.getElementById('perm-help');
-                        if(helpText) helpText.remove();
                     }
                 } else {
-                    showFrictionlessError();
+                    alert("Please open your iPhone Settings and allow notifications for this app.");
                 }
             } catch (error) {
                 console.error("Token error:", error);
-                alert("Connection error. Try reloading the page.");
             }
         });
 
+        // Handle alerts while actively viewing the app
         onMessage(messaging, (payload) => {
             alert(`Mosque Update: ${payload.notification.title}\n${payload.notification.body}`);
         });
@@ -114,7 +111,7 @@ const setupNotifications = async () => {
     }
 };
 
-// Boot notifications if Android OR installed iOS
-if (!isIos() || isStandalone()) {
+// Fire the setup strictly for installed users
+if (isStandalone() || (!isIos() && window.matchMedia('(display-mode: standalone)').matches)) {
     setupNotifications();
 }
