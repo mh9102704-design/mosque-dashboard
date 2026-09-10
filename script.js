@@ -59,14 +59,21 @@ if (isStandalone() || !isIos()) {
 // Button Logic to Request Notification Permissions
 const enableBtn = document.getElementById('enable-notifications-btn');
 enableBtn.addEventListener('click', async () => {
+    // Button Logic to Request Notification Permissions
+const enableBtn = document.getElementById('enable-notifications-btn');
+enableBtn.addEventListener('click', async () => {
     try {
         // Ask the user for permission
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
-            // Generate the secure device token using your VAPID key
+            // Explicitly point to the GitHub Pages sub-folder
+            const registration = await navigator.serviceWorker.register('/mosque-dashboard/firebase-messaging-sw.js');
+            
+            // Generate the secure device token
             const token = await getToken(messaging, { 
-                vapidKey: "BFiA28041VRV4E9YXRwBqh6t2npCEUCnmQKK9Zfzy7tNNJM-vNonF8hEsnxXf2m985T0Gi-hQDCRqeBQooGK3wk" 
+                vapidKey: "BFiA28041VRV4E9YXRwBqh6t2npCEUCnmQKK9Zfzy7tNNJM-vNonF8hEsnxXf2m985T0Gi-hQDCRqeBQooGK3wk",
+                serviceWorkerRegistration: registration
             });
             
             if (token) {
@@ -80,6 +87,7 @@ enableBtn.addEventListener('click', async () => {
         }
     } catch (error) {
         console.error("Error setting up notifications:", error);
+        alert("An error occurred. Check your connection and try again.");
     }
 });
 
