@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 
 // Your exact Firebase web configuration
 const firebaseConfig = {
@@ -14,6 +15,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const messaging = getMessaging(app);
 
 // Listen for real-time updates from Firestore
 const docRef = doc(db, "prayer_times", "current_schedule");
@@ -40,19 +42,48 @@ const isStandalone = () => {
   return ('standalone' in window.navigator) && (window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
 };
 
-// Show iOS installation modal if on Safari mobile and not added to home screen
 if (isIos() && !isStandalone()) {
     document.getElementById('ios-install-modal').classList.remove('hidden');
     document.getElementById('ios-install-modal').classList.add('flex');
 }
 
-// Close modal button listener
 document.getElementById('close-modal-btn').addEventListener('click', () => {
     document.getElementById('ios-install-modal').classList.add('hidden');
     document.getElementById('ios-install-modal').classList.remove('flex');
 });
 
-// Show "Enable Notifications" button for Android or installed PWA
 if (isStandalone() || !isIos()) {
     document.getElementById('notification-section').classList.remove('hidden');
 }
+
+// Button Logic to Request Notification Permissions
+const enableBtn = document.getElementById('enable-notifications-btn');
+enableBtn.addEventListener('click', async () => {
+    try {
+        // Ask the user for permission
+        const permission = await Notification.requestPermission();
+        
+        if (permission === 'granted') {
+            // Generate the secure device token using your VAPID key
+            const token = await getToken(messaging, { 
+                vapidKey: "BFiA28041VRV4E9YXRwBqh6t2npCEUCnmQKK9Zfzy7tNNJM-vNonF8hEsnxXf2m985T0Gi-hQDCRqeBQooGK3wk" 
+            });
+            
+            if (token) {
+                console.log("Device Token:", token);
+                enableBtn.innerText = "✅ Alerts Enabled";
+                enableBtn.classList.replace("bg-blue-600", "bg-emerald-600");
+                enableBtn.disabled = true;
+            }
+        } else {
+            alert("Permission denied. You can enable notifications in your browser settings.");
+        }
+    } catch (error) {
+        console.error("Error setting up notifications:", error);
+    }
+});
+
+// Handle incoming alerts if the user is actively looking at the webpage
+onMessage(messaging, (payload) => {
+    alert(`Mosque Update: ${payload.notification.title}\n${payload.notification.body}`);
+});
