@@ -2,7 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebas
 import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 
-// Your exact Firebase web configuration
 const firebaseConfig = {
   apiKey: "AIzaSyA97omfdQj62cjtgNg51uji7pjXNMkh1aA",
   authDomain: "mosqueclocksystem.firebaseapp.com",
@@ -12,10 +11,10 @@ const firebaseConfig = {
   appId: "1:868033914800:web:6229b57b9c75bc7f101875"
 };
 
-// 1. Initialize Core App & Database
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// 1. Live Sync
 const docRef = doc(db, "prayer_times", "current_schedule");
 onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
@@ -29,28 +28,34 @@ onSnapshot(docRef, (docSnap) => {
     }
 });
 
-// 2. iOS PWA & Device Detection Logic
-const isIos = () => {
-  const userAgent = window.navigator.userAgent.toLowerCase();
-  return /iphone|ipad|ipod/.test(userAgent);
-};
-const isStandalone = () => {
-  return ('standalone' in window.navigator) && (window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
-};
+// 2. Universal PWA Installation Flow
+const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+const isStandalone = () => ('standalone' in window.navigator) && (window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
 
-if (isIos() && !isStandalone()) {
-    document.getElementById('ios-install-modal').classList.remove('hidden');
-    document.getElementById('ios-install-modal').classList.add('flex');
+// If they are NOT opening this from their home screen, force the install modal
+if (!isStandalone()) {
+    const modal = document.getElementById('ios-install-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Dynamically swap the text if they are on Android
+    if (!isIos()) {
+        document.querySelector('#ios-install-modal p.text-gray-600').innerText = "To receive prayer alerts reliably, you must install this app to your Home Screen.";
+        document.querySelector('#ios-install-modal .bg-gray-50').innerHTML = '<p class="mb-2 text-sm">1. Tap the <strong>three dots (⋮)</strong> in the top right of Chrome.</p><p class="text-sm">2. Tap <strong>Add to Home screen</strong>.</p>';
+    }
 }
+
 document.getElementById('close-modal-btn').addEventListener('click', () => {
     document.getElementById('ios-install-modal').classList.add('hidden');
     document.getElementById('ios-install-modal').classList.remove('flex');
 });
-if (isStandalone() || !isIos()) {
+
+// Only show the Notification button IF they are using the installed Home Screen app
+if (isStandalone()) {
     document.getElementById('notification-section').classList.remove('hidden');
 }
 
-// 3. Push Notifications with Frictionless UX
+// 3. Push Notifications
 const setupNotifications = async () => {
     try {
         const messagingSupported = await isSupported();
@@ -59,29 +64,8 @@ const setupNotifications = async () => {
         const messaging = getMessaging(app);
         const enableBtn = document.getElementById('enable-notifications-btn');
         
-        // Helper function for smooth error UI
-        const showFrictionlessError = () => {
-            enableBtn.innerText = "🔒 Action Required";
-            enableBtn.classList.replace("bg-blue-600", "bg-orange-600");
-            
-            let helpText = document.getElementById('perm-help');
-            if (!helpText) {
-                helpText = document.createElement('div');
-                helpText.id = 'perm-help';
-                helpText.className = "text-sm text-gray-700 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-left shadow-sm";
-                helpText.innerHTML = "<strong>Notifications are blocked by your browser.</strong><br><br>1. Tap the 🔒 <strong>lock icon</strong> in the address bar at the top of your screen.<br>2. Tap <strong>Permissions</strong>.<br>3. Switch Notifications to <strong>Allow</strong>.<br>4. Reload this page.";
-                enableBtn.parentNode.appendChild(helpText);
-            }
-        };
-        
         enableBtn.addEventListener('click', async () => {
             try {
-                // If already denied, show instructions instantly
-                if (Notification.permission === 'denied') {
-                    showFrictionlessError();
-                    return;
-                }
-
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
                     const swPath = window.location.pathname.includes('mosque-dashboard') 
@@ -97,29 +81,24 @@ const setupNotifications = async () => {
                     if (token) {
                         enableBtn.innerText = "✅ Alerts Enabled";
                         enableBtn.classList.replace("bg-blue-600", "bg-emerald-600");
-                        enableBtn.classList.replace("bg-orange-600", "bg-emerald-600");
                         enableBtn.disabled = true;
-                        
-                        const helpText = document.getElementById('perm-help');
-                        if(helpText) helpText.remove();
                     }
                 } else {
-                    showFrictionlessError();
+                    alert("Please enable notifications in your phone's app settings.");
                 }
             } catch (error) {
                 console.error("Token error:", error);
             }
         });
 
-        // Display alerts silently if user is actively on the app
         onMessage(messaging, (payload) => {
-             // Optional: You can replace this with a Tailwind banner later instead of an alert
-             alert(`Mosque Update: ${payload.notification.title}\n${payload.notification.body}`);
+            alert(`Mosque Update: ${payload.notification.title}\n${payload.notification.body}`);
         });
-        
     } catch (err) {
         console.error("Messaging setup failed:", err);
     }
 };
 
-setupNotifications();
+if (isStandalone()) {
+    setupNotifications();
+}
