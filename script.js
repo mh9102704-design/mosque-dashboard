@@ -12,7 +12,7 @@ const firebaseConfig = {
   appId: "1:868033914800:web:6229b57b9c75bc7f101875"
 };
 
-// 1. Initialize Core App & Database First (Guarantees times will load)
+// 1. Initialize Core App & Database
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
@@ -50,52 +50,71 @@ if (isStandalone() || !isIos()) {
     document.getElementById('notification-section').classList.remove('hidden');
 }
 
-// 3. Push Notifications (Wrapped safely to prevent crashing the times)
+// 3. Push Notifications with Frictionless UX
 const setupNotifications = async () => {
     try {
-        // Check if the browser actually supports Firebase Messaging first
         const messagingSupported = await isSupported();
-        if (!messagingSupported) {
-            console.warn("This browser does not support Firebase Cloud Messaging.");
-            return;
-        }
+        if (!messagingSupported) return;
 
         const messaging = getMessaging(app);
         const enableBtn = document.getElementById('enable-notifications-btn');
         
+        // Helper function for smooth error UI
+        const showFrictionlessError = () => {
+            enableBtn.innerText = "🔒 Action Required";
+            enableBtn.classList.replace("bg-blue-600", "bg-orange-600");
+            
+            let helpText = document.getElementById('perm-help');
+            if (!helpText) {
+                helpText = document.createElement('div');
+                helpText.id = 'perm-help';
+                helpText.className = "text-sm text-gray-700 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-left shadow-sm";
+                helpText.innerHTML = "<strong>Notifications are blocked by your browser.</strong><br><br>1. Tap the 🔒 <strong>lock icon</strong> in the address bar at the top of your screen.<br>2. Tap <strong>Permissions</strong>.<br>3. Switch Notifications to <strong>Allow</strong>.<br>4. Reload this page.";
+                enableBtn.parentNode.appendChild(helpText);
+            }
+        };
+        
         enableBtn.addEventListener('click', async () => {
             try {
+                // If already denied, show instructions instantly
+                if (Notification.permission === 'denied') {
+                    showFrictionlessError();
+                    return;
+                }
+
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
-                    // Dynamically set the Service Worker path to avoid 404 folder errors
                     const swPath = window.location.pathname.includes('mosque-dashboard') 
                         ? '/mosque-dashboard/firebase-messaging-sw.js' 
                         : './firebase-messaging-sw.js';
                         
                     const registration = await navigator.serviceWorker.register(swPath);
-                    
                     const token = await getToken(messaging, { 
                         vapidKey: "BFiA28041VRV4E9YXRwBqh6t2npCEUCnmQKK9Zfzy7tNNJM-vNonF8hEsnxXf2m985T0Gi-hQDCRqeBQooGK3wk",
                         serviceWorkerRegistration: registration
                     });
                     
                     if (token) {
-                        console.log("Device Token:", token);
                         enableBtn.innerText = "✅ Alerts Enabled";
                         enableBtn.classList.replace("bg-blue-600", "bg-emerald-600");
+                        enableBtn.classList.replace("bg-orange-600", "bg-emerald-600");
                         enableBtn.disabled = true;
+                        
+                        const helpText = document.getElementById('perm-help');
+                        if(helpText) helpText.remove();
                     }
                 } else {
-                    alert("Notification permission denied. You can enable it in your browser settings.");
+                    showFrictionlessError();
                 }
             } catch (error) {
                 console.error("Token error:", error);
-                alert("Could not enable notifications. Try reloading the page.");
             }
         });
 
+        // Display alerts silently if user is actively on the app
         onMessage(messaging, (payload) => {
-            alert(`Mosque Update: ${payload.notification.title}\n${payload.notification.body}`);
+             // Optional: You can replace this with a Tailwind banner later instead of an alert
+             alert(`Mosque Update: ${payload.notification.title}\n${payload.notification.body}`);
         });
         
     } catch (err) {
@@ -103,5 +122,4 @@ const setupNotifications = async () => {
     }
 };
 
-// Boot the notification system quietly in the background
 setupNotifications();
