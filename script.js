@@ -14,7 +14,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 1. Live Sync (Runs immediately so they see times while installing)
+// 1. Live Sync
 const docRef = doc(db, "prayer_times", "current_schedule");
 onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
@@ -28,36 +28,49 @@ onSnapshot(docRef, (docSnap) => {
     }
 });
 
-// 2. Strict iOS Detection & PWA Enforcement
+// 2. Device Routing & iOS Instructions
 const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-const isStandalone = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+const isStandalone = () => ('standalone' in window.navigator) && (window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
 
-// If they are on an iPhone but in the Safari browser, show the instructional overlay
 if (isIos() && !isStandalone()) {
     const modal = document.getElementById('ios-install-modal');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    
-    // Inject strictly Apple-specific visual instructions
-    document.querySelector('#ios-install-modal .bg-gray-50').innerHTML = `
-        <div style="display: flex; align-items: center; margin-bottom: 12px;">
-            <span style="font-size: 24px; margin-right: 12px;">📤</span>
-            <p class="text-sm m-0">Tap the <strong>Share</strong> icon at the bottom of Safari.</p>
-        </div>
-        <div style="display: flex; align-items: center;">
-            <span style="font-size: 24px; margin-right: 12px;">➕</span>
-            <p class="text-sm m-0">Scroll down and tap <strong>Add to Home Screen</strong>.</p>
-        </div>
-    `;
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        const modalContent = modal.querySelector('.bg-gray-50');
+        if (modalContent) {
+            modalContent.innerHTML = `
+                <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                    <span style="font-size: 24px; margin-right: 12px;">📤</span>
+                    <p class="text-sm m-0">Tap the <strong>Share</strong> icon at the bottom of Safari.</p>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <span style="font-size: 24px; margin-right: 12px;">➕</span>
+                    <p class="text-sm m-0">Scroll down and tap <strong>Add to Home Screen</strong>.</p>
+                </div>
+            `;
+        }
+    }
 }
 
-// Ensure they can dismiss the modal if they just want to read the times
-document.getElementById('close-modal-btn').addEventListener('click', () => {
-    document.getElementById('ios-install-modal').classList.add('hidden');
-    document.getElementById('ios-install-modal').classList.remove('flex');
-});
+const closeModalBtn = document.getElementById('close-modal-btn');
+if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', () => {
+        const modal = document.getElementById('ios-install-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    });
+}
 
-// 3. Notification Setup (ONLY triggers in the installed Home Screen app)
+// Always make sure the notification container is visible
+const notifSection = document.getElementById('notification-section');
+if (notifSection) {
+    notifSection.classList.remove('hidden');
+}
+
+// 3. Notification Setup (Runs for all devices)
 const setupNotifications = async () => {
     try {
         const messagingSupported = await isSupported();
@@ -65,9 +78,7 @@ const setupNotifications = async () => {
 
         const messaging = getMessaging(app);
         const enableBtn = document.getElementById('enable-notifications-btn');
-        
-        // Only unhide the notification button in the installed app environment
-        document.getElementById('notification-section').classList.remove('hidden');
+        if (!enableBtn) return;
 
         enableBtn.addEventListener('click', async () => {
             try {
@@ -84,7 +95,7 @@ const setupNotifications = async () => {
                     });
                     
                     if (token) {
-                        // Automatically register the user to Firestore
+                        // Save token to Firestore 'subscribers' collection
                         await setDoc(doc(db, "subscribers", token), {
                             token: token,
                             timestamp: new Date()
@@ -95,14 +106,14 @@ const setupNotifications = async () => {
                         enableBtn.disabled = true;
                     }
                 } else {
-                    alert("Please open your iPhone Settings and allow notifications for this app.");
+                    alert("Notifications are blocked in your browser settings.");
                 }
             } catch (error) {
                 console.error("Token error:", error);
+                alert("Connection error. Try reloading the page.");
             }
         });
 
-        // Handle alerts while actively viewing the app
         onMessage(messaging, (payload) => {
             alert(`Mosque Update: ${payload.notification.title}\n${payload.notification.body}`);
         });
@@ -111,7 +122,4 @@ const setupNotifications = async () => {
     }
 };
 
-// Fire the setup strictly for installed users
-if (isStandalone() || (!isIos() && window.matchMedia('(display-mode: standalone)').matches)) {
-    setupNotifications();
-}
+setupNotifications();
