@@ -28,21 +28,14 @@ onSnapshot(docRef, (docSnap) => {
     }
 });
 
-// 2. Universal PWA Installation Flow
+// 2. Strict Device Routing
 const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
 const isStandalone = () => ('standalone' in window.navigator) && (window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
 
-// If they are NOT opening this from their home screen, force the install modal
-if (!isStandalone()) {
-    const modal = document.getElementById('ios-install-modal');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    
-    // Dynamically swap the text if they are on Android
-    if (!isIos()) {
-        document.querySelector('#ios-install-modal p.text-gray-600').innerText = "To receive prayer alerts reliably, you must install this app to your Home Screen.";
-        document.querySelector('#ios-install-modal .bg-gray-50').innerHTML = '<p class="mb-2 text-sm">1. Tap the <strong>three dots (⋮)</strong> in the top right of Chrome.</p><p class="text-sm">2. Tap <strong>Add to Home screen</strong>.</p>';
-    }
+// If iOS and NOT on home screen -> Force Install Modal
+if (isIos() && !isStandalone()) {
+    document.getElementById('ios-install-modal').classList.remove('hidden');
+    document.getElementById('ios-install-modal').classList.add('flex');
 }
 
 document.getElementById('close-modal-btn').addEventListener('click', () => {
@@ -50,8 +43,8 @@ document.getElementById('close-modal-btn').addEventListener('click', () => {
     document.getElementById('ios-install-modal').classList.remove('flex');
 });
 
-// Only show the Notification button IF they are using the installed Home Screen app
-if (isStandalone()) {
+// Show Notification button for Android (always) OR installed iOS
+if (!isIos() || isStandalone()) {
     document.getElementById('notification-section').classList.remove('hidden');
 }
 
@@ -64,8 +57,26 @@ const setupNotifications = async () => {
         const messaging = getMessaging(app);
         const enableBtn = document.getElementById('enable-notifications-btn');
         
+        const showFrictionlessError = () => {
+            enableBtn.innerText = "🔒 Action Required";
+            enableBtn.classList.replace("bg-blue-600", "bg-orange-600");
+            let helpText = document.getElementById('perm-help');
+            if (!helpText) {
+                helpText = document.createElement('div');
+                helpText.id = 'perm-help';
+                helpText.className = "text-sm text-gray-700 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-left shadow-sm";
+                helpText.innerHTML = "<strong>Alerts are blocked by your browser.</strong><br><br>1. Tap the settings icon next to the web address at the top.<br>2. Tap <strong>Permissions</strong>.<br>3. Allow Notifications.<br>4. Reload this page.";
+                enableBtn.parentNode.appendChild(helpText);
+            }
+        };
+
         enableBtn.addEventListener('click', async () => {
             try {
+                if (Notification.permission === 'denied') {
+                    showFrictionlessError();
+                    return;
+                }
+
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
                     const swPath = window.location.pathname.includes('mosque-dashboard') 
@@ -81,13 +92,17 @@ const setupNotifications = async () => {
                     if (token) {
                         enableBtn.innerText = "✅ Alerts Enabled";
                         enableBtn.classList.replace("bg-blue-600", "bg-emerald-600");
+                        if(enableBtn.classList.contains("bg-orange-600")) enableBtn.classList.replace("bg-orange-600", "bg-emerald-600");
                         enableBtn.disabled = true;
+                        const helpText = document.getElementById('perm-help');
+                        if(helpText) helpText.remove();
                     }
                 } else {
-                    alert("Please enable notifications in your phone's app settings.");
+                    showFrictionlessError();
                 }
             } catch (error) {
                 console.error("Token error:", error);
+                alert("Connection error. Try reloading the page.");
             }
         });
 
@@ -99,6 +114,7 @@ const setupNotifications = async () => {
     }
 };
 
-if (isStandalone()) {
+// Boot notifications if Android OR installed iOS
+if (!isIos() || isStandalone()) {
     setupNotifications();
 }
