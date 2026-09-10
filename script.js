@@ -84,9 +84,8 @@ const setupNotifications = async () => {
             try {
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
-                    const swPath = window.location.pathname.includes('mosque-dashboard') 
-                        ? '/mosque-dashboard/firebase-messaging-sw.js' 
-                        : './firebase-messaging-sw.js';
+                    // Path simplified to ensure it finds the new Service Worker file
+                    const swPath = 'firebase-messaging-sw.js';
                         
                     const registration = await navigator.serviceWorker.register(swPath);
                     const token = await getToken(messaging, { 
